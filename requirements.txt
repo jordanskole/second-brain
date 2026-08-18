@@ -1,0 +1,4 @@
+mlx-embeddings>=0.1.0
+numpy>=1.26,<3
+duckdb>=1.5.0
+mcp[cli]>=2.0.0
