@@ -7,6 +7,20 @@ Durable, version-controlled archive of Claude Code session transcripts.
 gitignored here and kept in a separate private store — nothing in this repo
 ever contains conversation content.
 
+## Requirements
+
+- **macOS only.** Scheduling is done via launchd (`init.sh` installs
+  LaunchAgents); there's no cron/systemd equivalent here yet.
+- **Apple Silicon only, for the search index.** The embedding model runs on
+  [MLX](https://github.com/ml-explore/mlx) (`mlx-embeddings`), which is
+  Apple Silicon-specific — it won't run on Intel Macs or Linux. Archival
+  itself (`bin/archive-sessions.sh`, the git mirroring) has no such
+  restriction; only `build_index.py`/semantic search need MLX.
+- Embedding a large backlog takes a while the first time (minutes, not
+  seconds, for a few hundred sessions) since every session gets chunked and
+  run through the model locally. Steady-state nightly runs are fast since
+  only new/changed sessions get re-embedded.
+
 ## Why
 
 Claude Code session transcripts (`~/.claude/projects/<project>/<uuid>.jsonl`) expire
