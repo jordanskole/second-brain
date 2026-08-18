@@ -139,6 +139,11 @@ imports are left in place in `inbox-openai/` for retry. Backed by
 
 ## Bootstrap (one-time setup on a new machine)
 
+Don't run shell scripts off the internet willy-nilly, including this one —
+read [`init.sh`](init.sh) first so you know what it's doing (scaffolding
+dirs, writing launchd plists into `~/Library/LaunchAgents/`, and enabling
+them) before you run it.
+
 Clone this repo wherever you want it to live (e.g. `~/code/second-brain`),
 then run:
 
