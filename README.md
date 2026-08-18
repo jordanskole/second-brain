@@ -21,6 +21,8 @@ archived yet.
 
 - `sessions/` — mirror of `~/.claude/projects/`, one subdirectory per project. Gitignored in this repo; tracked in git in the private archive.
 - `bin/archive-sessions.sh` — the archival script, run nightly by launchd.
+- `launchd/*.plist.template` — launchd job templates, filled in by `init.sh`.
+- `init.sh` — one-time bootstrap: scaffolds dirs and installs the launchd jobs.
 - `.state/` — local bookkeeping (last-run timestamp, run lock). Gitignored.
 - `logs/` — launchd stdout/stderr from each run. Gitignored.
 
@@ -42,17 +44,17 @@ stays in history even after the source `.jsonl` expires and disappears upstream.
 ## Scheduling
 
 Runs nightly at 3:00 AM via a macOS launchd LaunchAgent:
-`~/Library/LaunchAgents/com.yourname.second-brain.archive-sessions.plist`. It also
+`~/Library/LaunchAgents/com.$(whoami).second-brain.archive-sessions.plist`. It also
 runs on login/reboot (`RunAtLoad`), which is safe since the script is idempotent.
 
 Useful commands:
 
 ```bash
 # Check the job is loaded and see its last exit code
-launchctl print gui/$(id -u)/com.yourname.second-brain.archive-sessions
+launchctl print gui/$(id -u)/com.$(whoami).second-brain.archive-sessions
 
 # Trigger an immediate run
-launchctl kickstart -k gui/$(id -u)/com.yourname.second-brain.archive-sessions
+launchctl kickstart -k gui/$(id -u)/com.$(whoami).second-brain.archive-sessions
 
 # Check what happened
 tail logs/archive-sessions.out.log
@@ -87,7 +89,7 @@ new messages get re-embedded.
 Instead of running `import-claude-ai-export.sh` by hand, drop the downloaded
 zip into `inbox/` (create it if it doesn't exist — it's gitignored, just
 local staging). A macOS launchd LaunchAgent
-(`~/Library/LaunchAgents/com.yourname.second-brain.watch-claude-ai-inbox.plist`,
+(`~/Library/LaunchAgents/com.$(whoami).second-brain.watch-claude-ai-inbox.plist`,
 `WatchPaths` on `inbox/`) fires within seconds of a file appearing there,
 runs every `*.zip` in `inbox/` through `import-claude-ai-export.sh`, and
 moves each one to `inbox/processed/<timestamp>-<name>.zip` once it succeeds.
@@ -127,7 +129,7 @@ Instead of running `import-openai-export.sh` by hand, drop the downloaded
 zip into `inbox-openai/` (create it if it doesn't exist — it's gitignored,
 just local staging; kept separate from the claude.ai `inbox/` rather than a
 shared/dispatched inbox). A macOS launchd LaunchAgent
-(`~/Library/LaunchAgents/com.yourname.second-brain.watch-openai-inbox.plist`,
+(`~/Library/LaunchAgents/com.$(whoami).second-brain.watch-openai-inbox.plist`,
 `WatchPaths` on `inbox-openai/`) fires within seconds of a file appearing
 there, runs every `*.zip` in `inbox-openai/` through
 `import-openai-export.sh`, and moves each one to
@@ -137,29 +139,20 @@ imports are left in place in `inbox-openai/` for retry. Backed by
 
 ## Bootstrap (one-time setup on a new machine)
 
+Clone this repo wherever you want it to live (e.g. `~/code/second-brain`),
+then run:
+
 ```bash
-mkdir -p ~/code/second-brain/{bin,sessions,logs,.state}
-cd ~/code/second-brain
-git init
-git config user.name "Your Name"
-git config user.email "you@example.com"
-chmod 755 bin/archive-sessions.sh
-git add README.md .gitignore bin/archive-sessions.sh
-git commit -m "Initial scaffold for nightly session archival"
-
-chmod 644 ~/Library/LaunchAgents/com.yourname.second-brain.archive-sessions.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.yourname.second-brain.archive-sessions.plist
-launchctl enable gui/$(id -u)/com.yourname.second-brain.archive-sessions
-launchctl kickstart -k gui/$(id -u)/com.yourname.second-brain.archive-sessions
-
-chmod 644 ~/Library/LaunchAgents/com.yourname.second-brain.watch-claude-ai-inbox.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.yourname.second-brain.watch-claude-ai-inbox.plist
-launchctl enable gui/$(id -u)/com.yourname.second-brain.watch-claude-ai-inbox
-
-chmod 644 ~/Library/LaunchAgents/com.yourname.second-brain.watch-openai-inbox.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.yourname.second-brain.watch-openai-inbox.plist
-launchctl enable gui/$(id -u)/com.yourname.second-brain.watch-openai-inbox
+./init.sh
 ```
+
+This creates the local dirs (`sessions/`, `logs/`, `.state/`, `inbox/`,
+`inbox-openai/`), `git init`s if needed, and installs+enables all three
+launchd jobs under a label derived from your username and the repo's actual
+path (`com.$(whoami).second-brain.*`) — no manual path/label editing
+required. The plist templates live in `launchd/`; `init.sh` fills in
+`__REPO_DIR__`/`__LABEL_PREFIX__` and writes the result to
+`~/Library/LaunchAgents/`. Safe to re-run.
 
 ## Encryption
 
