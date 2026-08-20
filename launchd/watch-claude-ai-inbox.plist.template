@@ -14,19 +14,25 @@
     <key>WorkingDirectory</key>
     <string>__REPO_DIR__</string>
 
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SECOND_BRAIN_DATA_DIR</key>
+        <string>__DATA_DIR__</string>
+    </dict>
+
     <key>WatchPaths</key>
     <array>
-        <string>__REPO_DIR__/inbox</string>
+        <string>__DATA_DIR__/inbox</string>
     </array>
 
     <key>RunAtLoad</key>
     <true/>
 
     <key>StandardOutPath</key>
-    <string>__REPO_DIR__/logs/watch-claude-ai-inbox.out.log</string>
+    <string>__DATA_DIR__/logs/watch-claude-ai-inbox.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>__REPO_DIR__/logs/watch-claude-ai-inbox.err.log</string>
+    <string>__DATA_DIR__/logs/watch-claude-ai-inbox.err.log</string>
 
     <key>ProcessType</key>
     <string>Background</string>

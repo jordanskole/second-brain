@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time setup: scaffolds ~/code/second-brain, installs the launchd jobs
+# One-time setup: scaffolds the code + data roots, installs the launchd jobs
 # for nightly archival and inbox watching. Safe to re-run (idempotent).
 set -euo pipefail
 
@@ -12,19 +12,21 @@ if ! xcode-select -p >/dev/null 2>&1; then
 fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DATA_DIR="${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}"
 LABEL_PREFIX="com.$(whoami).second-brain"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 
-echo "Repo dir:     $REPO_DIR"
+echo "Code dir:     $REPO_DIR"
+echo "Data dir:     $DATA_DIR (override by exporting SECOND_BRAIN_DATA_DIR before running this script)"
 echo "Label prefix: $LABEL_PREFIX"
 
-mkdir -p "$REPO_DIR"/{sessions,logs,.state,inbox,inbox-openai}
+mkdir -p "$DATA_DIR"/{sessions,logs,.state,inbox,inbox-openai}
 chmod +x "$REPO_DIR"/bin/*.sh
 
-if [[ ! -d "$REPO_DIR/.git" ]]; then
-  git -C "$REPO_DIR" init
-  echo "Initialized a fresh git repo at $REPO_DIR."
-  echo "Set your identity if needed: git config user.name / user.email"
+if [[ ! -d "$DATA_DIR/.git" ]]; then
+  git -C "$DATA_DIR" init
+  echo "Initialized a fresh git repo at $DATA_DIR (no remote -- keep it that way)."
+  echo "Set your identity if needed: git -C \"$DATA_DIR\" config user.name / user.email"
 fi
 
 mkdir -p "$LAUNCH_AGENTS_DIR"
@@ -34,7 +36,7 @@ install_job() {
   local template="$REPO_DIR/launchd/$name.plist.template"
   local dest="$LAUNCH_AGENTS_DIR/$LABEL_PREFIX.$name.plist"
 
-  sed -e "s|__REPO_DIR__|$REPO_DIR|g" -e "s|__LABEL_PREFIX__|$LABEL_PREFIX|g" \
+  sed -e "s|__REPO_DIR__|$REPO_DIR|g" -e "s|__DATA_DIR__|$DATA_DIR|g" -e "s|__LABEL_PREFIX__|$LABEL_PREFIX|g" \
     "$template" > "$dest"
   chmod 644 "$dest"
 
@@ -54,6 +56,6 @@ cat <<EOF
 
 Done. Useful commands:
   launchctl print gui/$(id -u)/$LABEL_PREFIX.archive-sessions
-  tail -f "$REPO_DIR/logs/archive-sessions.out.log"
-  git -C "$REPO_DIR" log --oneline
+  tail -f "$DATA_DIR/logs/archive-sessions.out.log"
+  git -C "$DATA_DIR" log --oneline
 EOF
