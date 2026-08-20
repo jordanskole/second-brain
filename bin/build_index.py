@@ -68,22 +68,34 @@ def main() -> None:
                 files_skipped += 1
                 continue
 
-            session_id = jsonl_file.stem
             file_chunks = list(extract.iter_chunks(jsonl_file, project))
+            # The session id used to delete a file's previous chunks must match what's
+            # actually stored on those rows -- not always the filename stem. Plan files
+            # (bin/import_plans.py) name the file after the plan's slug but stamp each
+            # record's sessionId as "plan-<slug>", so deriving the delete key from the
+            # filename silently deletes nothing and the reinsert collides with the rows
+            # from the previous embed. Deriving it from the chunks' own session_id keeps
+            # the delete and the insert operating on the same identity.
+            session_id = file_chunks[0].session_id if file_chunks else jsonl_file.stem
             print(f"Embedding session {session_id}: {len(file_chunks)} chunks")
 
             conn.begin()
-            storage.delete_chunks_for_source(conn, project, session_id)
+            try:
+                storage.delete_chunks_for_source(conn, project, session_id)
 
-            for batch in batched(file_chunks, BATCH_SIZE):
-                texts = [c.text for c in batch]
-                embs = embed_texts(model, tokenizer, texts)
-                for chunk, vec in zip(batch, embs):
-                    storage.insert_chunk(conn, chunk, vec)
+                for batch in batched(file_chunks, BATCH_SIZE):
+                    texts = [c.text for c in batch]
+                    embs = embed_texts(model, tokenizer, texts)
+                    for chunk, vec in zip(batch, embs):
+                        storage.insert_chunk(conn, chunk, vec)
 
-            embedded_at = datetime.now(timezone.utc).isoformat()
-            storage.upsert_source_file(conn, rel_path, current_mtime, len(file_chunks), embedded_at)
-            conn.commit()
+                embedded_at = datetime.now(timezone.utc).isoformat()
+                storage.upsert_source_file(conn, rel_path, current_mtime, len(file_chunks), embedded_at)
+                conn.commit()
+            except Exception as exc:
+                conn.rollback()
+                print(f"WARNING: skipping {rel_path}, failed to embed: {exc}", file=sys.stderr)
+                continue
 
             files_processed += 1
             chunks_added += len(file_chunks)
