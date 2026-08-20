@@ -151,6 +151,56 @@ there, runs every `*.zip` in `inbox-openai/` through
 imports are left in place in `inbox-openai/` for retry. Backed by
 `bin/watch-openai-inbox.sh`; logs go to `logs/watch-openai-inbox.{out,err}.log`.
 
+## Importing Codex CLI chat history
+
+Codex CLI stores live session transcripts locally at
+`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`, the same way Claude Code stores
+sessions under `~/.claude/projects/`. Because the data is already local (unlike
+ChatGPT/claude.ai, which require a manual export), this is captured the same
+way Claude Code sessions are: a nightly scan, not a manual import step.
+
+Codex has its own "import external agent sessions" feature that can replay
+previously-imported history (e.g. Claude Code sessions) into new Codex session
+files. That content is already archived from the original side, so
+`bin/import_codex_sessions.py` drops any turn tagged as a replay (`turn_id`
+prefixed `external-import-turn-`) rather than double-indexing it. Filtering
+happens per turn, not per file — if you continue one of those imported threads
+in Codex, the new messages you add are still captured.
+
+Each Codex session becomes `sessions/codex-<project-slug>/<session-id>.jsonl`
+(`<project-slug>` derived from the session's working directory; sessions with
+no recorded working directory land in `sessions/codex/`), converted into the
+same JSONL schema every other provider uses here.
+
+Two more Codex quirks the importer accounts for, found via real usage rather
+than anticipated up front:
+
+- For a chat with no project attached, Codex auto-creates a scratch workspace
+  under `~/Documents/Codex/<date>/<slug-of-opening-message>/` and reports that
+  as the session's working directory. Treating that path as a real project
+  would mint a new one-off `sessions/codex-<slug>/` folder per ad-hoc chat, so
+  it's detected and routed to the flat `sessions/codex/` fallback instead.
+- Codex injects a `<recommended_plugins>`/`<environment_context>` boilerplate
+  block as its own synthetic `role: user` message at the start of a session —
+  not something actually typed. `import_codex_sessions.py` strips it rather
+  than archiving/indexing it as real user content.
+
+### Automatic import: nightly scan
+
+A macOS launchd LaunchAgent
+(`~/Library/LaunchAgents/com.$(whoami).second-brain.archive-codex-sessions.plist`)
+runs `bin/archive-codex-sessions.sh` nightly at 3:15am (15 minutes after the
+Claude Code archive run, to avoid both jobs touching the git repo and search
+index at once). It finds rollout files with an mtime newer than the last
+successful run, converts them, commits any new/changed sessions, and rebuilds
+the search index. Logs go to `logs/archive-codex-sessions.{out,err}.log`.
+
+To run it immediately instead of waiting for the nightly schedule:
+
+```bash
+bin/archive-codex-sessions.sh
+```
+
 ## Bootstrap (one-time setup on a new machine)
 
 Don't run shell scripts off the internet willy-nilly, including this one —
@@ -166,7 +216,7 @@ then run:
 ```
 
 This creates the local dirs (`sessions/`, `logs/`, `.state/`, `inbox/`,
-`inbox-openai/`), `git init`s if needed, and installs+enables all three
+`inbox-openai/`), `git init`s if needed, and installs+enables all four
 launchd jobs under a label derived from your username and the repo's actual
 path (`com.$(whoami).second-brain.*`) — no manual path/label editing
 required. The plist templates live in `launchd/`; `init.sh` fills in

@@ -14,14 +14,15 @@ EMBED_DIM = 384
 SCHEMA_STATEMENTS = [
     f"""
     CREATE TABLE IF NOT EXISTS chunks (
-        chunk_id    TEXT PRIMARY KEY,
+        chunk_id    TEXT NOT NULL,
         session_id  TEXT NOT NULL,
         project     TEXT NOT NULL,
         role        TEXT NOT NULL CHECK (role IN ('user','assistant')),
         timestamp   TEXT NOT NULL,
         text        TEXT NOT NULL,
         char_len    INTEGER NOT NULL,
-        embedding   FLOAT[{EMBED_DIM}] NOT NULL
+        embedding   FLOAT[{EMBED_DIM}] NOT NULL,
+        PRIMARY KEY (session_id, chunk_id)
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_chunks_session ON chunks(session_id)",
@@ -64,8 +65,12 @@ def upsert_source_file(
     )
 
 
-def delete_chunks_for_session(conn: duckdb.DuckDBPyConnection, session_id: str) -> None:
-    conn.execute("DELETE FROM chunks WHERE session_id = ?", [session_id])
+def delete_chunks_for_source(conn: duckdb.DuckDBPyConnection, project: str, session_id: str) -> None:
+    # Scoped by (project, session_id), not session_id alone: a session can move to a
+    # different project directory (e.g. reclassified), leaving the same session_id
+    # briefly present at both an old and a new path within one index-build run.
+    # Deleting by session_id alone would wipe the freshly-inserted new-path rows too.
+    conn.execute("DELETE FROM chunks WHERE project = ? AND session_id = ?", [project, session_id])
 
 
 def list_source_paths(conn: duckdb.DuckDBPyConnection) -> list[str]:

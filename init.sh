@@ -3,6 +3,14 @@
 # for nightly archival and inbox watching. Safe to re-run (idempotent).
 set -euo pipefail
 
+if ! xcode-select -p >/dev/null 2>&1; then
+  echo "Xcode Command Line Tools aren't installed, so git isn't available yet." >&2
+  echo "Run 'xcode-select --install', click through the prompt, then re-run this script." >&2
+  echo "(Just running 'git' would trigger the same install dialog, but as a GUI popup" >&2
+  echo "this script can't wait on -- easy to miss and think the script hung.)" >&2
+  exit 1
+fi
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LABEL_PREFIX="com.$(whoami).second-brain"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
@@ -38,6 +46,7 @@ install_job() {
 install_job archive-sessions
 install_job watch-claude-ai-inbox
 install_job watch-openai-inbox
+install_job archive-codex-sessions
 
 launchctl kickstart -k "gui/$(id -u)/$LABEL_PREFIX.archive-sessions"
 

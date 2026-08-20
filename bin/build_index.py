@@ -72,7 +72,7 @@ def main() -> None:
             print(f"Embedding session {session_id}: {len(file_chunks)} chunks")
 
             conn.begin()
-            storage.delete_chunks_for_session(conn, session_id)
+            storage.delete_chunks_for_source(conn, project, session_id)
 
             for batch in batched(file_chunks, BATCH_SIZE):
                 texts = [c.text for c in batch]
@@ -92,9 +92,11 @@ def main() -> None:
     if orphaned_paths:
         conn.begin()
         for rel_path in orphaned_paths:
-            session_id = Path(rel_path).stem
+            path = Path(rel_path)
+            session_id = path.stem
+            project = path.parent.name
             print(f"Pruning orphaned source file: {rel_path}")
-            storage.delete_chunks_for_session(conn, session_id)
+            storage.delete_chunks_for_source(conn, project, session_id)
             storage.delete_source_file(conn, rel_path)
         conn.commit()
         files_pruned = len(orphaned_paths)
