@@ -4,9 +4,11 @@ set -euo pipefail
 PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 
 REPO_DIR="/Users/jordan/code/second-brain"
-INBOX_DIR="$REPO_DIR/inbox"
+DATA_DIR="${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}"
+export SECOND_BRAIN_DATA_DIR="$DATA_DIR"
+INBOX_DIR="$DATA_DIR/inbox"
 PROCESSED_DIR="$INBOX_DIR/processed"
-STATE_DIR="$REPO_DIR/.state"
+STATE_DIR="$DATA_DIR/.state"
 LOCK_DIR="$STATE_DIR/watch-inbox.lock"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] $*"; }

@@ -4,14 +4,16 @@ set -euo pipefail
 PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 
 REPO_DIR="/Users/jordan/code/second-brain"
+DATA_DIR="${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}"
+export SECOND_BRAIN_DATA_DIR="$DATA_DIR"
 SOURCE_ROOT="$HOME/.codex/sessions"
-STATE_DIR="$REPO_DIR/.state"
+STATE_DIR="$DATA_DIR/.state"
 STATE_FILE="$STATE_DIR/last_codex_run_epoch"
 LOCK_DIR="$STATE_DIR/run-codex.lock"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] $*"; }
 
-mkdir -p "$REPO_DIR/sessions" "$STATE_DIR"
+mkdir -p "$DATA_DIR/sessions" "$STATE_DIR"
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   log "Another run appears to be in progress ($LOCK_DIR exists). Exiting."
@@ -19,7 +21,7 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
-cd "$REPO_DIR"
+cd "$DATA_DIR"
 
 VENV_PYTHON="$REPO_DIR/.venv/bin/python"
 

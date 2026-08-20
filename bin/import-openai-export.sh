@@ -4,6 +4,8 @@ set -euo pipefail
 PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 
 REPO_DIR="/Users/jordan/code/second-brain"
+DATA_DIR="${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}"
+export SECOND_BRAIN_DATA_DIR="$DATA_DIR"
 VENV_PYTHON="$REPO_DIR/.venv/bin/python"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] $*"; }
@@ -15,7 +17,7 @@ fi
 
 EXPORT_PATH="$1"
 
-cd "$REPO_DIR"
+cd "$DATA_DIR"
 
 log "Converting openai export: $EXPORT_PATH"
 "$VENV_PYTHON" "$REPO_DIR/bin/import_openai_export.py" "$EXPORT_PATH"
