@@ -52,6 +52,7 @@ def main() -> None:
 
     files_skipped = 0
     files_processed = 0
+    files_failed = 0
     chunks_added = 0
     current_rel_paths = set()
 
@@ -90,11 +91,14 @@ def main() -> None:
                         storage.insert_chunk(conn, chunk, vec)
 
                 embedded_at = datetime.now(timezone.utc).isoformat()
-                storage.upsert_source_file(conn, rel_path, current_mtime, len(file_chunks), embedded_at)
+                storage.upsert_source_file(
+                    conn, rel_path, current_mtime, len(file_chunks), embedded_at, session_id
+                )
                 conn.commit()
             except Exception as exc:
                 conn.rollback()
                 print(f"WARNING: skipping {rel_path}, failed to embed: {exc}", file=sys.stderr)
+                files_failed += 1
                 continue
 
             files_processed += 1
@@ -106,7 +110,12 @@ def main() -> None:
         conn.begin()
         for rel_path in orphaned_paths:
             path = Path(rel_path)
-            session_id = path.stem
+            # Prefer the session_id stored alongside the source file (derived from the
+            # file's actual content when it was embedded -- see the comment above the
+            # embed loop's session_id derivation). The file no longer exists on disk to
+            # re-derive it from, so fall back to the filename stem for rows written
+            # before this column existed / before they've been re-embedded.
+            session_id = storage.get_source_session_id(conn, rel_path) or path.stem
             project = path.parent.name
             print(f"Pruning orphaned source file: {rel_path}")
             storage.delete_chunks_for_source(conn, project, session_id)
@@ -117,8 +126,12 @@ def main() -> None:
     conn.close()
     print(
         f"Done. {files_processed} file(s) embedded ({chunks_added} chunk(s)), "
-        f"{files_skipped} file(s) unchanged/skipped, {files_pruned} file(s) pruned."
+        f"{files_skipped} file(s) unchanged/skipped, {files_pruned} file(s) pruned, "
+        f"{files_failed} file(s) failed."
     )
+
+    if files_failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

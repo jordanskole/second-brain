@@ -1,11 +1,12 @@
 #!/bin/bash
-_guard="_ARGV0_RENAMED_$(basename "$0" .sh | tr '-' '_')"
-[ -n "${!_guard:-}" ] || { export "$_guard=1"; exec -a "sb-$(basename "$0" .sh)" /bin/bash "$0" "$@"; }
 set -euo pipefail
 
 PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 
-REPO_DIR="/Users/jordan/code/second-brain"
+_guard="_ARGV0_RENAMED_$(basename "$0" .sh | tr -c '[:alnum:]_' '_')"
+[ -n "${!_guard:-}" ] || { export "$_guard=1"; exec -a "sb-$(basename "$0" .sh)" /bin/bash "$0" "$@"; }
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}"
 export SECOND_BRAIN_DATA_DIR="$DATA_DIR"
 SOURCE_ROOT="$HOME/.claude/projects"
@@ -13,6 +14,7 @@ DEST_ROOT="$DATA_DIR/sessions"
 STATE_DIR="$DATA_DIR/.state"
 STATE_FILE="$STATE_DIR/last_run_epoch"
 LOCK_DIR="$STATE_DIR/run.lock"
+T7_BACKUP_DEST="${SECOND_BRAIN_T7_BACKUP_DEST:-jordan@apps.jarvis:/mnt/t7/backups/second-brain-data/}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] $*"; }
 
@@ -91,8 +93,12 @@ else
 fi
 
 log "Backing up to apps.jarvis T7..."
-if rsync -a --delete "$DATA_DIR/" jordan@apps.jarvis:/mnt/t7/backups/second-brain-data/; then
-  log "Backup to apps.jarvis complete."
+if [[ -d "$DATA_DIR/.state" && -d "$DATA_DIR/sessions" && -n "$(ls -A "$DATA_DIR/sessions" 2>/dev/null)" ]]; then
+  if rsync -a --delete "$DATA_DIR/" "$T7_BACKUP_DEST"; then
+    log "Backup to apps.jarvis complete."
+  else
+    log "WARNING: backup to apps.jarvis failed (exit $?). Local archive is unaffected."
+  fi
 else
-  log "WARNING: backup to apps.jarvis failed (exit $?). Local archive is unaffected."
+  log "WARNING: $DATA_DIR does not look populated, skipping T7 backup to avoid wiping the offsite copy."
 fi

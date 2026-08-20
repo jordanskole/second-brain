@@ -32,9 +32,16 @@ SCHEMA_STATEMENTS = [
         path        TEXT PRIMARY KEY,
         mtime       DOUBLE NOT NULL,
         chunk_count INTEGER NOT NULL,
-        embedded_at TEXT NOT NULL
+        embedded_at TEXT NOT NULL,
+        session_id  TEXT
     )
     """,
+]
+
+# Schema migrations for columns added after a table already existed on a live
+# database -- CREATE TABLE IF NOT EXISTS above won't retrofit these.
+MIGRATION_STATEMENTS = [
+    "ALTER TABLE source_files ADD COLUMN IF NOT EXISTS session_id TEXT",
 ]
 
 
@@ -42,6 +49,8 @@ def open_db(db_path: Path) -> duckdb.DuckDBPyConnection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(str(db_path))
     for stmt in SCHEMA_STATEMENTS:
+        conn.execute(stmt)
+    for stmt in MIGRATION_STATEMENTS:
         conn.execute(stmt)
     return conn
 
@@ -52,17 +61,28 @@ def get_source_mtime(conn: duckdb.DuckDBPyConnection, rel_path: str) -> float | 
 
 
 def upsert_source_file(
-    conn: duckdb.DuckDBPyConnection, rel_path: str, mtime: float, chunk_count: int, embedded_at: str
+    conn: duckdb.DuckDBPyConnection,
+    rel_path: str,
+    mtime: float,
+    chunk_count: int,
+    embedded_at: str,
+    session_id: str,
 ) -> None:
     conn.execute(
-        """INSERT INTO source_files (path, mtime, chunk_count, embedded_at)
-           VALUES (?, ?, ?, ?)
+        """INSERT INTO source_files (path, mtime, chunk_count, embedded_at, session_id)
+           VALUES (?, ?, ?, ?, ?)
            ON CONFLICT (path) DO UPDATE SET
                mtime = excluded.mtime,
                chunk_count = excluded.chunk_count,
-               embedded_at = excluded.embedded_at""",
-        [rel_path, mtime, chunk_count, embedded_at],
+               embedded_at = excluded.embedded_at,
+               session_id = excluded.session_id""",
+        [rel_path, mtime, chunk_count, embedded_at, session_id],
     )
+
+
+def get_source_session_id(conn: duckdb.DuckDBPyConnection, rel_path: str) -> str | None:
+    row = conn.execute("SELECT session_id FROM source_files WHERE path = ?", [rel_path]).fetchone()
+    return row[0] if row else None
 
 
 def delete_chunks_for_source(conn: duckdb.DuckDBPyConnection, project: str, session_id: str) -> None:

@@ -1,11 +1,12 @@
 #!/bin/bash
-_guard="_ARGV0_RENAMED_$(basename "$0" .sh | tr '-' '_')"
-[ -n "${!_guard:-}" ] || { export "$_guard=1"; exec -a "sb-$(basename "$0" .sh)" /bin/bash "$0" "$@"; }
 set -euo pipefail
 
 PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 
-REPO_DIR="/Users/jordan/code/second-brain"
+_guard="_ARGV0_RENAMED_$(basename "$0" .sh | tr -c '[:alnum:]_' '_')"
+[ -n "${!_guard:-}" ] || { export "$_guard=1"; exec -a "sb-$(basename "$0" .sh)" /bin/bash "$0" "$@"; }
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}"
 export SECOND_BRAIN_DATA_DIR="$DATA_DIR"
 INBOX_DIR="$DATA_DIR/inbox-openai"
