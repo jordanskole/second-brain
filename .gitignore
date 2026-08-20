@@ -1,9 +1,3 @@
-.state/
-logs/
 .venv/
-embeddings/
 __pycache__/
 .env
-inbox/
-inbox-openai/
-sessions/

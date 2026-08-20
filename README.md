@@ -2,10 +2,12 @@
 
 Durable, version-controlled archive of Claude Code session transcripts.
 
-**This repo is the tooling only.** The actual archive it produces
-(`sessions/`, `embeddings/`, and other personal transcript data) is
-gitignored here and kept in a separate private store — nothing in this repo
-ever contains conversation content.
+**This repo is code only.** The actual archive it produces (`sessions/`,
+`embeddings/`, and other personal transcript data) lives in a separate
+directory — its own local git repo, never given a remote — that this code
+reads and writes via the `SECOND_BRAIN_DATA_DIR` environment variable. See
+[Layout](#layout). Nothing in this repo's working tree or history ever
+contains conversation content.
 
 ## Requirements
 
@@ -33,20 +35,32 @@ archived yet.
 
 ## Layout
 
-- `sessions/` — mirror of `~/.claude/projects/`, one subdirectory per project. Gitignored in this repo; tracked in git in the private archive.
-- `bin/archive-sessions.sh` — the archival script, run nightly by launchd.
-- `launchd/*.plist.template` — launchd job templates, filled in by `init.sh`.
-- `init.sh` — one-time bootstrap: scaffolds dirs and installs the launchd jobs.
-- `.state/` — local bookkeeping (last-run timestamp, run lock). Gitignored.
-- `logs/` — launchd stdout/stderr from each run. Gitignored.
+Code and data are two separate roots, joined by one environment variable —
+this repo never holds session content, so it can be public.
+
+- **This repo** — `bin/*.sh`/`bin/*.py` (archival, import, and search
+  scripts), `launchd/*.plist.template`, `init.sh` (one-time bootstrap:
+  scaffolds the data root and installs the launchd jobs), tests.
+- **The data root** — `$SECOND_BRAIN_DATA_DIR`, defaulting to
+  `~/second-brain-data` if the variable is unset. Holds `sessions/`
+  (mirror of `~/.claude/projects/`, one subdirectory per project),
+  `embeddings/` (the search index), `logs/` (launchd stdout/stderr),
+  `.state/` (last-run timestamps, run locks), `inbox/`/`inbox-openai/`
+  (manual-export staging, see below). It's its own local git repo — commit
+  history for the session archive — but `init.sh` never gives it a remote,
+  and it shouldn't ever get one.
+
+Every script resolves `SECOND_BRAIN_DATA_DIR` at startup with that same
+`~/second-brain-data` fallback; export it before running `init.sh` (or
+any `bin/*.sh` script) to put the data root somewhere else.
 
 ## How it works
 
 Each run:
 1. Finds every `~/.claude/projects/*/*.jsonl` file with an mtime newer than the last
    successful run.
-2. Copies changed files into `sessions/`, preserving the relative
-   `<project-dir>/<uuid>.jsonl` path.
+2. Copies changed files into the data root's `sessions/`, preserving the
+   relative `<project-dir>/<uuid>.jsonl` path.
 3. `git add` + `git commit`s the result. If nothing actually changed content-wise,
    git no-ops (commit is skipped).
 4. Only after a successful add/commit does it advance the last-run timestamp — a
@@ -70,10 +84,10 @@ launchctl print gui/$(id -u)/com.$(whoami).second-brain.archive-sessions
 # Trigger an immediate run
 launchctl kickstart -k gui/$(id -u)/com.$(whoami).second-brain.archive-sessions
 
-# Check what happened
-tail logs/archive-sessions.out.log
-tail logs/archive-sessions.err.log
-git log --oneline
+# Check what happened (paths under the data root, ~/second-brain-data by default)
+tail "${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}/logs/archive-sessions.out.log"
+tail "${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}/logs/archive-sessions.err.log"
+git -C "${SECOND_BRAIN_DATA_DIR:-$HOME/second-brain-data}" log --oneline
 ```
 
 ## Importing claude.ai (web) chat history
@@ -101,14 +115,16 @@ new messages get re-embedded.
 ### Automatic import: drop the export in `inbox/`
 
 Instead of running `import-claude-ai-export.sh` by hand, drop the downloaded
-zip into `inbox/` (create it if it doesn't exist — it's gitignored, just
-local staging). A macOS launchd LaunchAgent
+zip into the data root's `inbox/` (`init.sh` creates it; just local
+staging, not tracked in the data root's own git history). A macOS launchd
+LaunchAgent
 (`~/Library/LaunchAgents/com.$(whoami).second-brain.watch-claude-ai-inbox.plist`,
 `WatchPaths` on `inbox/`) fires within seconds of a file appearing there,
 runs every `*.zip` in `inbox/` through `import-claude-ai-export.sh`, and
 moves each one to `inbox/processed/<timestamp>-<name>.zip` once it succeeds.
 Failed imports are left in place in `inbox/` for retry. Backed by
-`bin/watch-claude-ai-inbox.sh`; logs go to `logs/watch-claude-ai-inbox.{out,err}.log`.
+`bin/watch-claude-ai-inbox.sh`; logs go to the data root's
+`logs/watch-claude-ai-inbox.{out,err}.log`.
 
 ## Importing ChatGPT (OpenAI) chat history
 
@@ -140,16 +156,17 @@ re-embedded.
 ### Automatic import: drop the export in `inbox-openai/`
 
 Instead of running `import-openai-export.sh` by hand, drop the downloaded
-zip into `inbox-openai/` (create it if it doesn't exist — it's gitignored,
-just local staging; kept separate from the claude.ai `inbox/` rather than a
-shared/dispatched inbox). A macOS launchd LaunchAgent
+zip into the data root's `inbox-openai/` (`init.sh` creates it; kept
+separate from the claude.ai `inbox/` rather than a shared/dispatched
+inbox). A macOS launchd LaunchAgent
 (`~/Library/LaunchAgents/com.$(whoami).second-brain.watch-openai-inbox.plist`,
 `WatchPaths` on `inbox-openai/`) fires within seconds of a file appearing
 there, runs every `*.zip` in `inbox-openai/` through
 `import-openai-export.sh`, and moves each one to
 `inbox-openai/processed/<timestamp>-<name>.zip` once it succeeds. Failed
 imports are left in place in `inbox-openai/` for retry. Backed by
-`bin/watch-openai-inbox.sh`; logs go to `logs/watch-openai-inbox.{out,err}.log`.
+`bin/watch-openai-inbox.sh`; logs go to the data root's
+`logs/watch-openai-inbox.{out,err}.log`.
 
 ## Importing Codex CLI chat history
 
@@ -193,7 +210,8 @@ runs `bin/archive-codex-sessions.sh` nightly at 3:15am (15 minutes after the
 Claude Code archive run, to avoid both jobs touching the git repo and search
 index at once). It finds rollout files with an mtime newer than the last
 successful run, converts them, commits any new/changed sessions, and rebuilds
-the search index. Logs go to `logs/archive-codex-sessions.{out,err}.log`.
+the search index. Logs go to the data root's
+`logs/archive-codex-sessions.{out,err}.log`.
 
 To run it immediately instead of waiting for the nightly schedule:
 
@@ -208,20 +226,27 @@ read [`init.sh`](init.sh) first so you know what it's doing (scaffolding
 dirs, writing launchd plists into `~/Library/LaunchAgents/`, and enabling
 them) before you run it.
 
-Clone this repo wherever you want it to live (e.g. `~/code/second-brain`),
-then run:
+Clone this repo wherever you want the *code* to live (e.g.
+`~/code/second-brain`), then run:
 
 ```bash
 ./init.sh
 ```
 
-This creates the local dirs (`sessions/`, `logs/`, `.state/`, `inbox/`,
-`inbox-openai/`), `git init`s if needed, and installs+enables all four
-launchd jobs under a label derived from your username and the repo's actual
-path (`com.$(whoami).second-brain.*`) — no manual path/label editing
-required. The plist templates live in `launchd/`; `init.sh` fills in
-`__REPO_DIR__`/`__LABEL_PREFIX__` and writes the result to
-`~/Library/LaunchAgents/`. Safe to re-run.
+By default this creates the data root at `~/second-brain-data` — export
+`SECOND_BRAIN_DATA_DIR=/wherever/you/want` first if you'd rather put it
+somewhere else (a different drive, an iCloud-excluded folder, whatever).
+`init.sh` scaffolds the data root's dirs (`sessions/`, `logs/`, `.state/`,
+`inbox/`, `inbox-openai/`), `git init`s it if needed (and never gives it a
+remote — keep it that way), and installs+enables all four launchd jobs
+under a label derived from your username and this repo's actual path
+(`com.$(whoami).second-brain.*`) — no manual path/label editing required.
+The plist templates live in `launchd/`; `init.sh` fills in
+`__REPO_DIR__`/`__DATA_DIR__`/`__LABEL_PREFIX__` and writes the result to
+`~/Library/LaunchAgents/`, including an explicit `SECOND_BRAIN_DATA_DIR` in
+each job's environment (launchd doesn't inherit your shell's env, so this
+is what makes a non-default data root stick for the scheduled jobs, not
+just interactive runs). Safe to re-run.
 
 ## Encryption
 
