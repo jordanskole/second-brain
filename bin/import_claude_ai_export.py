@@ -24,8 +24,8 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-REPO_DIR = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = REPO_DIR / "sessions"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+SESSIONS_DIR = DATA_DIR / "sessions"
 
 ROLE_BY_SENDER = {"human": "user", "assistant": "assistant"}
 

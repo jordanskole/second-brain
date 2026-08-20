@@ -30,8 +30,8 @@ import re
 import sys
 from pathlib import Path
 
-REPO_DIR = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = REPO_DIR / "sessions"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+SESSIONS_DIR = DATA_DIR / "sessions"
 
 EXTERNAL_IMPORT_PREFIX = "external-import-turn-"
 TEXT_CONTENT_TYPES = {"input_text", "output_text"}

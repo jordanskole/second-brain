@@ -27,8 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-REPO_DIR = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = REPO_DIR / "sessions"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+SESSIONS_DIR = DATA_DIR / "sessions"
 TARGET_DIR = SESSIONS_DIR / "openai"
 
 ROLE_BY_AUTHOR = {"user": "user", "assistant": "assistant"}

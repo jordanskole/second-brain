@@ -31,8 +31,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SOURCE_DIR = Path.home() / ".claude" / "plans"
-REPO_DIR = Path(__file__).resolve().parent.parent
-TARGET_DIR = REPO_DIR / "sessions" / "plans"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+TARGET_DIR = DATA_DIR / "sessions" / "plans"
 
 SECTION_RE = re.compile(r"^## .+$", re.MULTILINE)
 

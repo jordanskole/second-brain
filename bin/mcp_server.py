@@ -6,6 +6,7 @@ time, so the server can start and respond to capability negotiation instantly
 even before the (multi-second) model load has happened.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -14,8 +15,8 @@ from mcp.server import MCPServer
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import storage
 
-REPO_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = REPO_DIR / "embeddings" / "index.duckdb"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+DB_PATH = DATA_DIR / "embeddings" / "index.duckdb"
 MODEL_NAME = "mlx-community/all-MiniLM-L6-v2-4bit"
 MAX_TEXT_CHARS = 1500
 

@@ -2,6 +2,7 @@
 """Semantic search over the embedded session index."""
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -10,8 +11,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import storage
 
-REPO_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = REPO_DIR / "embeddings" / "index.duckdb"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+DB_PATH = DATA_DIR / "embeddings" / "index.duckdb"
 MODEL_NAME = "mlx-community/all-MiniLM-L6-v2-4bit"
 
 

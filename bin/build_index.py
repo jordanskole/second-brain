@@ -7,6 +7,7 @@ of the whole file (session files are append-only archival snapshots, so this is
 cheap and avoids per-line diffing).
 """
 
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,9 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extract
 import storage
 
-REPO_DIR = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = REPO_DIR / "sessions"
-DB_PATH = REPO_DIR / "embeddings" / "index.duckdb"
+DATA_DIR = Path(os.environ.get("SECOND_BRAIN_DATA_DIR", str(Path.home() / "second-brain-data")))
+SESSIONS_DIR = DATA_DIR / "sessions"
+DB_PATH = DATA_DIR / "embeddings" / "index.duckdb"
 MODEL_NAME = "mlx-community/all-MiniLM-L6-v2-4bit"
 BATCH_SIZE = 32
 
@@ -58,7 +59,7 @@ def main() -> None:
     for project_dir in project_dirs:
         project = project_dir.name
         for jsonl_file in sorted(project_dir.glob("*.jsonl")):
-            rel_path = str(jsonl_file.relative_to(REPO_DIR))
+            rel_path = str(jsonl_file.relative_to(DATA_DIR))
             current_rel_paths.add(rel_path)
             current_mtime = jsonl_file.stat().st_mtime
             last_mtime = storage.get_source_mtime(conn, rel_path)
