@@ -14,7 +14,13 @@ DEST_ROOT="$DATA_DIR/sessions"
 STATE_DIR="$DATA_DIR/.state"
 STATE_FILE="$STATE_DIR/last_run_epoch"
 LOCK_DIR="$STATE_DIR/run.lock"
-T7_BACKUP_DEST="${SECOND_BRAIN_T7_BACKUP_DEST:-jordan@apps.jarvis:/mnt/t7/backups/second-brain-data/}"
+
+# Machine-specific settings (e.g. an offsite backup destination) live in an
+# optional, never-committed env file alongside the data, not hardcoded here --
+# this script ships in a public repo with no knowledge of any one person's
+# infrastructure.
+[[ -f "$DATA_DIR/.env" ]] && source "$DATA_DIR/.env"
+T7_BACKUP_DEST="${SECOND_BRAIN_T7_BACKUP_DEST:-}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] $*"; }
 
@@ -92,13 +98,17 @@ else
   log "WARNING: $VENV_PYTHON not found. Skipping search index update."
 fi
 
-log "Backing up to apps.jarvis T7..."
-if [[ -d "$DATA_DIR/.state" && -d "$DATA_DIR/sessions" && -n "$(ls -A "$DATA_DIR/sessions" 2>/dev/null)" ]]; then
-  if rsync -a --delete "$DATA_DIR/" "$T7_BACKUP_DEST"; then
-    log "Backup to apps.jarvis complete."
-  else
-    log "WARNING: backup to apps.jarvis failed (exit $?). Local archive is unaffected."
-  fi
+if [[ -z "$T7_BACKUP_DEST" ]]; then
+  log "No offsite backup destination configured (set SECOND_BRAIN_T7_BACKUP_DEST in $DATA_DIR/.env to enable). Skipping."
 else
-  log "WARNING: $DATA_DIR does not look populated, skipping T7 backup to avoid wiping the offsite copy."
+  log "Backing up to $T7_BACKUP_DEST..."
+  if [[ -d "$DATA_DIR/.state" && -d "$DATA_DIR/sessions" && -n "$(ls -A "$DATA_DIR/sessions" 2>/dev/null)" ]]; then
+    if rsync -a --delete "$DATA_DIR/" "$T7_BACKUP_DEST"; then
+      log "Backup complete."
+    else
+      log "WARNING: backup failed (exit $?). Local archive is unaffected."
+    fi
+  else
+    log "WARNING: $DATA_DIR does not look populated, skipping backup to avoid wiping the offsite copy."
+  fi
 fi

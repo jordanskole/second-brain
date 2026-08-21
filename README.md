@@ -69,6 +69,20 @@ Each run:
 Nothing is ever deleted or pruned from `sessions/` — once a session is archived it
 stays in history even after the source `.jsonl` expires and disappears upstream.
 
+### Optional: offsite backup
+
+After each run, `archive-sessions.sh` will also `rsync` the data root to a
+remote destination — but only if you've configured one. This is
+machine-specific, so it lives in an env file next to the data, not in this
+repo: create `$SECOND_BRAIN_DATA_DIR/.env` (gitignored by `init.sh`) with
+
+```bash
+SECOND_BRAIN_T7_BACKUP_DEST=user@host:/path/to/backup/dir/
+```
+
+Leave it unset (or don't create the file) and this step is skipped with a
+one-line log message, no error.
+
 ## Scheduling
 
 Runs nightly at 3:00 AM via a macOS launchd LaunchAgent:

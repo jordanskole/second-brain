@@ -29,7 +29,7 @@ if [[ ! -d "$DATA_DIR/.git" ]]; then
   echo "Set your identity if needed: git -C \"$DATA_DIR\" config user.name / user.email"
 fi
 
-printf 'embeddings/\nlogs/\n.state/\ninbox/\ninbox-openai/\n' > "$DATA_DIR/.gitignore"
+printf 'embeddings/\nlogs/\n.state/\ninbox/\ninbox-openai/\n.env\n' > "$DATA_DIR/.gitignore"
 
 mkdir -p "$LAUNCH_AGENTS_DIR"
 
